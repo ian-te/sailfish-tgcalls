@@ -64,9 +64,9 @@ jobs:
       - name: Build
         run: |
           mkdir -p out && sudo chmod -R a+rwX .
-          docker run --rm -v "$PWD:/work" \
+          docker run --rm -v "$PWD:/home/mersdk/work" -e W=/home/mersdk/work \
             -e GITHUB_RUN_NUMBER \
-            $SDK_IMAGE bash /work/ci/build.sh "$ARCH"
+            $SDK_IMAGE bash /home/mersdk/work/ci/build.sh "$ARCH"
 
       - name: Save the tg_owt build
         if: always() && steps.tg_owt_cache.outputs.cache-hit != 'true' && hashFiles('src/tg_owt/out/libtg_owt.a') != ''

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Runs inside the Sailfish Platform SDK image with the workspace mounted at /work.
-# Builds openh264 -> tg_owt -> Fernschreiber with calls (PR #583), aarch64, and drops the RPM in /work/out.
-# Sources are fetched by the workflow into /work/src/{openh264,tg_owt,tgcalls,fernschreiber}.
+# Runs inside the Sailfish Platform SDK image with the workspace mounted at $W (under /home).
+# Builds openh264 -> tg_owt -> Fernschreiber with calls (PR #583), aarch64, and drops the RPM in $W/out.
+# Sources are fetched by the workflow into $W/src/{openh264,tg_owt,tgcalls,fernschreiber}.
 set -euo pipefail
 ARCH=${1:-aarch64}
-W=/work
+W=${W:-/work}  # must be under /home: the scratchbox2 build view only maps the host paths it knows
 OUT=$W/out
 mkdir -p $OUT
 log() { echo "== $*" | tee -a $OUT/summary.txt; }
@@ -13,6 +13,10 @@ target=$(ls /srv/mer/targets | grep -E "^SailfishOS-[0-9.]+-${ARCH}\$" | sort -V
 log "target $target"
 sb()     { sb2 -t "$target" "$@"; }
 sbroot() { sb2 -t "$target" -m sdk-install -R "$@"; }
+log "user $(whoami), HOME $HOME, workspace $W"
+if ! (cd $W/src/openh264 && sb test -f Makefile); then
+  log "scratchbox2 cannot see $W"; exit 1
+fi
 
 # --- Target dependencies (the ones Fernschreiber's spec doesn't already pull in) ---
 log "installing target build dependencies"
