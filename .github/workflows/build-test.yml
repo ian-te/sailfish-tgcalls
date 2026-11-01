@@ -1,0 +1,60 @@
+name: Build test (tg_owt for Sailfish)
+
+# Step 1 of bringing Telegram calls to Sailfish OS: can Telegram's WebRTC fork (desktop-app/tg_owt,
+# which builds with CMake instead of Google's gn) be compiled with the Sailfish SDK for aarch64?
+# The job probes the target's toolchain, installs what dependencies it can, then attempts the build.
+# Logs are kept as an artifact whether it succeeds or not.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tg_owt_ref:
+        description: tg_owt branch, tag or commit
+        default: master
+
+env:
+  SDK_IMAGE: coderus/sailfishos-platform-sdk:latest
+  ARCH: aarch64
+
+jobs:
+  tg_owt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make room for the SDK image
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          docker system prune -af >/dev/null
+          df -h /
+
+      - name: Fetch tg_owt with its bundled third-party code
+        run: |
+          git clone --recursive --depth 1 --shallow-submodules \
+            --branch "${{ github.event.inputs.tg_owt_ref || 'master' }}" \
+            https://github.com/desktop-app/tg_owt.git tg_owt \
+          || { git clone --recursive https://github.com/desktop-app/tg_owt.git tg_owt \
+               && git -C tg_owt checkout "${{ github.event.inputs.tg_owt_ref }}" \
+               && git -C tg_owt submodule update --init --recursive; }
+          git -C tg_owt log -1 --format='tg_owt %H %cs %s'
+
+      - name: Probe, install dependencies, build
+        run: |
+          mkdir -p out && chmod a+w out
+          docker run --rm \
+            -v "$PWD:/src:ro" -v "$PWD/out:/out" \
+            $SDK_IMAGE bash /src/ci/build-tg_owt.sh "$ARCH"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tg_owt-${{ env.ARCH }}-logs
+          retention-days: 14
+          path: out/
+
+      - name: Result
+        run: |
+          cat out/summary.txt
+          test -f out/SUCCESS
