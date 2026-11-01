@@ -17,7 +17,9 @@ env:
   ARCH: aarch64
   # Revisions doc/voicecalls.md was tested with.
   TG_OWT_REPO: https://github.com/Michal-Szczepaniak/tg_owt.git
-  TG_OWT_REV: '3215153'
+  # Full hash: this commit is on no branch any more (likely force-pushed over), so a plain clone
+  # doesn't have it. GitHub still serves it when fetched by full hash.
+  TG_OWT_REV: 321515325f118e682e3c65f5152a8ce56b4aa5c1
   TGCALLS_REPO: https://github.com/Michal-Szczepaniak/tgcalls.git
   TGCALLS_REV: 8a5b4eb
   OPENH264_TAG: v2.6.0
@@ -43,8 +45,11 @@ jobs:
         run: |
           mkdir -p src && cd src
           git clone --depth 1 --branch "$OPENH264_TAG" https://github.com/cisco/openh264.git openh264
-          git clone "$TG_OWT_REPO" tg_owt && git -C tg_owt checkout -q "$TG_OWT_REV" \
-            && git -C tg_owt submodule update --init --recursive --depth 50 || git -C tg_owt submodule update --init --recursive
+          git init -q tg_owt && git -C tg_owt remote add origin "$TG_OWT_REPO"
+          git -C tg_owt fetch -q --depth 1 origin "$TG_OWT_REV"
+          git -C tg_owt checkout -q FETCH_HEAD
+          test "$(git -C tg_owt rev-parse HEAD)" = "$TG_OWT_REV"
+          git -C tg_owt submodule update --init --recursive
           git clone "$TGCALLS_REPO" tgcalls && git -C tgcalls checkout -q "$TGCALLS_REV"
           git clone --recursive https://github.com/JimKnopfIoT/harbour-fernschreiber.git fernschreiber
           git -C fernschreiber checkout -q "${{ github.event.inputs.fernschreiber_ref || 'voice-calls' }}"
