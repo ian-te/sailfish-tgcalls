@@ -59,11 +59,16 @@ else
   sb cmake .. \
       -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DTG_OWT_PACKAGED_BUILD=ON \
       -DTG_OWT_BUILD_AUDIO_BACKENDS=ON -DTG_OWT_USE_X11=OFF -DTG_OWT_USE_PIPEWIRE=OFF \
-      -DTG_OWT_USE_PROTOBUF=OFF > $OUT/tg_owt-configure.txt 2>&1 \
+      -DTG_OWT_USE_PROTOBUF=OFF \
+      -DCMAKE_CXX_FLAGS="-include cstdint" > $OUT/tg_owt-configure.txt 2>&1 \
     || { log "tg_owt configure failed"; tail -40 $OUT/tg_owt-configure.txt | tee -a $OUT/summary.txt; exit 1; }
-  if ! sb make -j"$(nproc)" > $OUT/tg_owt-build.txt 2>&1; then
+  # -k: keep going, so one run shows every file that doesn't compile, not just the first.
+  # -include cstdint above: GCC 13 no longer pulls in <cstdint> transitively, and this WebRTC
+  # snapshot predates that (first hit: rtc_base/third_party/base64/base64.h).
+  if ! sb make -k -j"$(nproc)" > $OUT/tg_owt-build.txt 2>&1; then
     log "tg_owt build failed after $(( ($(date +%s) - start) / 60 )) min"
-    grep -E 'error:' $OUT/tg_owt-build.txt | sort | uniq -c | sort -rn | head -30 | tee -a $OUT/summary.txt
+    log "files with errors: $(grep -oE '^[^ :]+\.(cc|cpp|c|h|S):[0-9]+:[0-9]+: error' $OUT/tg_owt-build.txt | cut -d: -f1 | sort -u | wc -l)"
+    grep -E ': (fatal )?error:' $OUT/tg_owt-build.txt | sed -E 's|^/home/mersdk/work/src/tg_owt/||' | sort -u | head -60 | tee -a $OUT/summary.txt
     exit 1
   fi
   log "tg_owt ok in $(( ($(date +%s) - start) / 60 )) min"
