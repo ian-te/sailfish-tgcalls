@@ -35,6 +35,12 @@ sb make -j"$(nproc)" OS=linux ARCH=arm64 USE_ASM=Yes PREFIX=/usr LIBDIR_NAME=lib
 # it into the target with cp.
 sb make OS=linux ARCH=arm64 PREFIX=/usr LIBDIR_NAME=lib64 DESTDIR=$W/deps/stage install-shared >> $OUT/openh264.txt 2>&1 \
   || { log "openh264 install failed"; tail -20 $OUT/openh264.txt | tee -a $OUT/summary.txt; exit 1; }
+# install-shared puts the libraries in lib/ whatever LIBDIR_NAME says; the target's are in lib64/.
+if [ -d $W/deps/stage/usr/lib ]; then
+  mv $W/deps/stage/usr/lib/libopenh264* $W/deps/stage/usr/lib64/ && rmdir $W/deps/stage/usr/lib
+fi
+sed -i 's|^libdir=.*|libdir=/usr/lib64|' $W/deps/stage/usr/lib64/pkgconfig/openh264.pc
+cat $W/deps/stage/usr/lib64/pkgconfig/openh264.pc >> $OUT/openh264.txt
 sbroot cp -a $W/deps/stage/usr/. /usr/ >> $OUT/openh264.txt 2>&1 \
   || { log "copying openh264 into the target failed"; tail -10 $OUT/openh264.txt | tee -a $OUT/summary.txt; exit 1; }
 mkdir -p $W/deps/openh264
