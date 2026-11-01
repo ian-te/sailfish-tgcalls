@@ -56,12 +56,12 @@ else
   log "building tg_owt"
   start=$(date +%s)
   mkdir -p $W/src/tg_owt/out && cd $W/src/tg_owt/out
-  sb cmake .. -G Ninja \
+  sb cmake .. \
       -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DTG_OWT_PACKAGED_BUILD=ON \
       -DTG_OWT_BUILD_AUDIO_BACKENDS=ON -DTG_OWT_USE_X11=OFF -DTG_OWT_USE_PIPEWIRE=OFF \
       -DTG_OWT_USE_PROTOBUF=OFF > $OUT/tg_owt-configure.txt 2>&1 \
     || { log "tg_owt configure failed"; tail -40 $OUT/tg_owt-configure.txt | tee -a $OUT/summary.txt; exit 1; }
-  if ! sb ninja -j"$(nproc)" > $OUT/tg_owt-build.txt 2>&1; then
+  if ! sb make -j"$(nproc)" > $OUT/tg_owt-build.txt 2>&1; then
     log "tg_owt build failed after $(( ($(date +%s) - start) / 60 )) min"
     grep -E 'error:' $OUT/tg_owt-build.txt | sort | uniq -c | sort -rn | head -30 | tee -a $OUT/summary.txt
     exit 1
