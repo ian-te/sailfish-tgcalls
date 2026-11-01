@@ -55,6 +55,21 @@ if [ -f $W/src/tg_owt/out/libtg_owt.a ]; then
 else
   log "building tg_owt"
   start=$(date +%s)
+  # With TG_OWT_USE_PIPEWIRE=OFF tg_owt drops the PipeWire desktop-capture sources but still builds
+  # the PipeWire camera-capture ones, which need pipewire headers. Their only callers are behind
+  # WEBRTC_USE_PIPEWIRE, so leave them out too.
+  sed -i '/^if (NOT TG_OWT_USE_PIPEWIRE)/{n;a\
+        modules/video_capture/linux/camera_portal.cc\
+        modules/video_capture/linux/camera_portal.h\
+        modules/video_capture/linux/device_info_pipewire.cc\
+        modules/video_capture/linux/device_info_pipewire.h\
+        modules/video_capture/linux/pipewire_session.cc\
+        modules/video_capture/linux/pipewire_session.h\
+        modules/video_capture/linux/video_capture_pipewire.cc\
+        modules/video_capture/linux/video_capture_pipewire.h
+}' $W/src/tg_owt/CMakeLists.txt
+  grep -c 'video_capture/linux/pipewire_session.cc' $W/src/tg_owt/CMakeLists.txt | grep -qx 2 \
+    || { log "patching tg_owt's PipeWire source list failed"; exit 1; }
   mkdir -p $W/src/tg_owt/out && cd $W/src/tg_owt/out
   sb cmake .. \
       -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DTG_OWT_PACKAGED_BUILD=ON \
