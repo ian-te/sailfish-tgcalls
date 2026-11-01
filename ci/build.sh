@@ -121,6 +121,18 @@ done
 # A test-build release number: above the branch's 0.19-1 (and any installed 0.18), below a real 0.19-2.
 sed -i "s/^Release:.*/Release:    1.calls.${GITHUB_RUN_NUMBER:-0}/" rpm/harbour-fernschreiber.spec
 
+# voip.pri builds the app as C++20 (for tgcalls/WebRTC). Qt 5.6's headers declare some constructors
+# as template-ids, e.g. "QFutureInterface<void>(State ...)", which C++20 forbids (DR 2237) and GCC 11+
+# rejects; the older GCC on 4.6/5.0 targets accepted it. Rewrite them to the plain constructor name
+# in the build target's copy of the headers. Equivalent code; nothing on the phone changes.
+log "patching template-id constructors in the target's Qt 5 headers for C++20"
+ctor_re='^(\s+(explicit\s+)?)(Q[A-Za-z]+)<[A-Za-z0-9_, ]+>\((const |State |\))'
+for h in $(grep -rlE "$ctor_re" $sysroot/usr/include/qt5 || true); do
+  rel=${h#$sysroot}
+  sbroot sed -i -E "s/$ctor_re/\1\3(\4/" "$rel"
+  log "  patched $rel"
+done
+
 log "building Fernschreiber with calls"
 start=$(date +%s)
 if ! mb2 -t $target build -- --with voicecalls \
