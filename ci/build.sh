@@ -31,9 +31,16 @@ log "building openh264"
 cd $W/src/openh264
 sb make -j"$(nproc)" OS=linux ARCH=arm64 USE_ASM=Yes PREFIX=/usr LIBDIR_NAME=lib64 > $OUT/openh264.txt 2>&1 \
   || { log "openh264 build failed"; tail -40 $OUT/openh264.txt | tee -a $OUT/summary.txt; exit 1; }
-sbroot make OS=linux ARCH=arm64 PREFIX=/usr LIBDIR_NAME=lib64 install-shared >> $OUT/openh264.txt 2>&1
+# make isn't available in the target's root mode, so stage the install as the build user and copy
+# it into the target with cp.
+sb make OS=linux ARCH=arm64 PREFIX=/usr LIBDIR_NAME=lib64 DESTDIR=$W/deps/stage install-shared >> $OUT/openh264.txt 2>&1 \
+  || { log "openh264 install failed"; tail -20 $OUT/openh264.txt | tee -a $OUT/summary.txt; exit 1; }
+sbroot cp -a $W/deps/stage/usr/. /usr/ >> $OUT/openh264.txt 2>&1 \
+  || { log "copying openh264 into the target failed"; tail -10 $OUT/openh264.txt | tee -a $OUT/summary.txt; exit 1; }
 mkdir -p $W/deps/openh264
-cp -L /srv/mer/targets/$target/usr/lib64/libopenh264.so.8 $W/deps/openh264/
+cp -L $W/deps/stage/usr/lib64/libopenh264.so.8 $W/deps/openh264/
+sb pkg-config --modversion openh264 >> $OUT/summary.txt 2>&1 \
+  || { log "pkg-config can't find openh264 in the target"; exit 1; }
 log "openh264 ok: $(ls $W/deps/openh264)"
 
 # --- 2. tg_owt (static), restored from cache when its revision hasn't changed ---
