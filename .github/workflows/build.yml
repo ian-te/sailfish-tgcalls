@@ -1,0 +1,90 @@
+name: Fernschreiber with calls
+
+# Builds Fernschreiber with 1:1 voice and video calls (Wunderfitz/harbour-fernschreiber PR #583,
+# branch JimKnopfIoT:voice-calls) for Sailfish OS aarch64, following that branch's doc/voicecalls.md:
+# openh264 and tg_owt from source, tgcalls compiled into the app, TDLib from Wunderfitz/td.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      fernschreiber_ref:
+        description: Commit or branch of JimKnopfIoT/harbour-fernschreiber
+        default: voice-calls
+
+env:
+  SDK_IMAGE: coderus/sailfishos-platform-sdk:latest
+  ARCH: aarch64
+  # Revisions doc/voicecalls.md was tested with.
+  TG_OWT_REPO: https://github.com/Michal-Szczepaniak/tg_owt.git
+  TG_OWT_REV: '3215153'
+  TGCALLS_REPO: https://github.com/Michal-Szczepaniak/tgcalls.git
+  TGCALLS_REV: 8a5b4eb
+  OPENH264_TAG: v2.6.0
+  TDLIB_URL: https://github.com/Wunderfitz/td/releases/download/v1.8.67/tdlib.zip
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make room for the SDK image
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          docker system prune -af >/dev/null
+          df -h /
+
+      - name: Fetch sources
+        run: |
+          mkdir -p src && cd src
+          git clone --depth 1 --branch "$OPENH264_TAG" https://github.com/cisco/openh264.git openh264
+          git clone "$TG_OWT_REPO" tg_owt && git -C tg_owt checkout -q "$TG_OWT_REV" \
+            && git -C tg_owt submodule update --init --recursive --depth 50 || git -C tg_owt submodule update --init --recursive
+          git clone "$TGCALLS_REPO" tgcalls && git -C tgcalls checkout -q "$TGCALLS_REV"
+          git clone --recursive https://github.com/JimKnopfIoT/harbour-fernschreiber.git fernschreiber
+          git -C fernschreiber checkout -q "${{ github.event.inputs.fernschreiber_ref || 'voice-calls' }}"
+          git -C fernschreiber submodule update --init --recursive
+          curl -fsSL -o tdlib.zip "$TDLIB_URL"
+          for d in openh264 tg_owt tgcalls fernschreiber; do echo "$d $(git -C $d log -1 --format='%h %cs %s')"; done
+
+      # tg_owt is by far the slowest step and only changes with TG_OWT_REV. Saved separately below,
+      # so a later Fernschreiber failure doesn't throw away a good tg_owt build.
+      - name: Restore the tg_owt build
+        id: tg_owt_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: src/tg_owt/out
+          key: tg_owt-${{ env.TG_OWT_REV }}-${{ env.ARCH }}-v1
+
+      - name: Build
+        run: |
+          mkdir -p out && sudo chmod -R a+rwX .
+          docker run --rm -v "$PWD:/work" \
+            -e GITHUB_RUN_NUMBER \
+            $SDK_IMAGE bash /work/ci/build.sh "$ARCH"
+
+      - name: Save the tg_owt build
+        if: always() && steps.tg_owt_cache.outputs.cache-hit != 'true' && hashFiles('src/tg_owt/out/libtg_owt.a') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: src/tg_owt/out
+          key: tg_owt-${{ env.TG_OWT_REV }}-${{ env.ARCH }}-v1
+
+      - name: Summary
+        if: always()
+        run: cat out/summary.txt || true
+
+      # Logs always; the RPM only exists when the build got that far.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fernschreiber-calls-${{ env.ARCH }}
+          retention-days: 14
+          path: |
+            out/*.txt
+            out/*.rpm
