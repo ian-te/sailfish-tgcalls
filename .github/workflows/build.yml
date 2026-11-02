@@ -2,6 +2,7 @@ name: Fernschreiber with calls
 
 # Builds Fernschreiber with 1:1 voice and video calls (Wunderfitz/harbour-fernschreiber PR #583,
 # branch JimKnopfIoT:voice-calls) for Sailfish OS aarch64, following that branch's doc/voicecalls.md:
+# Source: our fork ian-te/harbour-fernschreiber, branch ian-ui (PR #583 plus our UI changes).
 # openh264 and tg_owt from source, tgcalls compiled into the app, TDLib from Wunderfitz/td.
 on:
   push:
@@ -9,12 +10,13 @@ on:
   workflow_dispatch:
     inputs:
       fernschreiber_ref:
-        description: Commit or branch of JimKnopfIoT/harbour-fernschreiber
-        default: voice-calls
+        description: Commit or branch of ian-te/harbour-fernschreiber
+        default: ian-ui
 
 env:
   SDK_IMAGE: coderus/sailfishos-platform-sdk:latest
   ARCH: aarch64
+  FERNSCHREIBER_REPO: https://github.com/ian-te/harbour-fernschreiber.git
   # Revisions doc/voicecalls.md was tested with.
   TG_OWT_REPO: https://github.com/Michal-Szczepaniak/tg_owt.git
   # Full hash: this commit is on no branch any more (likely force-pushed over), so a plain clone
@@ -51,8 +53,8 @@ jobs:
           test "$(git -C tg_owt rev-parse HEAD)" = "$TG_OWT_REV"
           git -C tg_owt submodule update --init --recursive
           git clone "$TGCALLS_REPO" tgcalls && git -C tgcalls checkout -q "$TGCALLS_REV"
-          git clone --recursive https://github.com/JimKnopfIoT/harbour-fernschreiber.git fernschreiber
-          git -C fernschreiber checkout -q "${{ github.event.inputs.fernschreiber_ref || 'voice-calls' }}"
+          git clone --recursive "$FERNSCHREIBER_REPO" fernschreiber
+          git -C fernschreiber checkout -q "${{ github.event.inputs.fernschreiber_ref || 'ian-ui' }}"
           git -C fernschreiber submodule update --init --recursive
           curl -fsSL -o tdlib.zip "$TDLIB_URL"
           for d in openh264 tg_owt tgcalls fernschreiber; do echo "$d $(git -C $d log -1 --format='%h %cs %s')"; done
