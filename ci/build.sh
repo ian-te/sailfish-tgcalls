@@ -23,7 +23,7 @@ log "installing target build dependencies"
 sbroot zypper --non-interactive in \
   openssl-devel libjpeg-turbo-devel opus-devel libvpx-devel ffmpeg-devel \
   pulseaudio-devel alsa-lib-devel glib2-devel libdrm-devel nasm \
-  qt5-qtmultimedia-devel qt5-qtsensors-devel > $OUT/deps.txt 2>&1 \
+  qt5-qtmultimedia-devel qt5-qtsensors-devel gstreamer1.0-devel gstreamer1.0-plugins-base-devel > $OUT/deps.txt 2>&1 \
   || { log "dependency install failed"; tail -30 $OUT/deps.txt | tee -a $OUT/summary.txt; exit 1; }
 
 # --- 1. openh264, installed into the target so pkg-config and the linker find it ---
