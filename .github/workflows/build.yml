@@ -14,7 +14,8 @@ on:
         default: ian-ui
 
 env:
-  SDK_IMAGE: coderus/sailfishos-platform-sdk:latest
+  # Pinned so a new Sailfish release does not change the build under us; bump on purpose.
+  SDK_IMAGE: coderus/sailfishos-platform-sdk:5.2.0.15
   ARCH: aarch64
   FERNSCHREIBER_REPO: https://github.com/ian-te/harbour-fernschreiber.git
   # Revisions doc/voicecalls.md was tested with.
@@ -91,7 +92,7 @@ jobs:
         if: always()
         with:
           name: fernschreiber-calls-${{ env.ARCH }}
-          retention-days: 14
+          retention-days: 90
           path: |
             out/*.txt
             out/*.rpm
